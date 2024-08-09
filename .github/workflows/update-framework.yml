@@ -26,7 +26,6 @@ jobs:
         run: |
           version=$(grep '^version =' rust/Cargo.toml | sed -E 's/version = "(.*)"/\1/')
           echo "VERSION_NUMBER=$version" >> $GITHUB_ENV
-        working-directory: rust
 
       - name: Check if Version Has Changed
         id: version_check
