@@ -18,6 +18,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: superwall/cel-evaluator-rs
+          token: ${{ secrets.GITHUB_TOKEN }}
           path: rust
 
       - name: Install Rust
