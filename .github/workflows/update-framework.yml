@@ -21,11 +21,55 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           path: rust
 
-      - name: Install Rust
+      - name: Extract Version Number from Cargo.toml
+        id: extract_version
         run: |
-          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-          source $HOME/.cargo/env
+          version=$(grep '^version =' rust/Cargo.toml | sed -E 's/version = "(.*)"/\1/')
+          echo "VERSION_NUMBER=$version" >> $GITHUB_ENV
         working-directory: rust
+
+      - name: Check if Version Has Changed
+        id: version_check
+        run: |
+          current_version=$(git tag --sort=-v:refname | grep '^v' | head -n 1 | sed 's/^v//')
+          echo "Current version: $current_version"
+          echo "New version: ${{ env.VERSION_NUMBER }}"
+          if [ "$current_version" = "${{ env.VERSION_NUMBER }}" ]; then
+            echo "Version has not changed, exiting."
+            exit 0
+          fi
+
+      - name: Cache Rust toolchain
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo
+            ~/.rustup
+          key: ${{ runner.os }}-rust-toolchain-${{ hashFiles('**/rust-toolchain') }}
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache Cargo build
+        uses: actions/cache@v3
+        with:
+          path: rust/target
+          key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-build-
+
+      - name: Install Rust (if not cached)
+        run: |
+          if [ ! -x "$(command -v rustup)" ]; then
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+          fi
+          source $HOME/.cargo/env
+        shell: bash
 
       - name: Build iOS Framework
         run: |
@@ -51,3 +95,9 @@ jobs:
           git add .
           git commit -m "Update framework"
           git push origin main
+
+      - name: Tag the New Version
+        run: |
+          git tag -a "${{ env.VERSION_NUMBER }}" -m "Release version ${{ env.VERSION_NUMBER }}"
+          git push origin "${{ env.VERSION_NUMBER }}"
+        working-directory: ios
