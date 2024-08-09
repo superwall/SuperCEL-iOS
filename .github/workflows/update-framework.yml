@@ -1,0 +1,52 @@
+name: Update Framework
+
+on:
+  repository_dispatch:
+    types: [update-build]
+
+jobs:
+  update_framework:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout CEL iOS Repository
+        uses: actions/checkout@v4
+        with:
+          path: ios
+
+      - name: Checkout CEL Rust Repository
+        uses: actions/checkout@v4
+        with:
+          repository: superwall/cel-evaluator-rs
+          path: rust
+
+      - name: Install Rust
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+          source $HOME/.cargo/env
+        working-directory: rust
+
+      - name: Build iOS Framework
+        run: |
+          chmod +x ./build_ios.sh
+          ./build_ios.sh
+        working-directory: rust
+
+      - name: Replace XCFramework
+        run: |
+          rm -rf ios/Frameworks/libcel.xcframework
+          mv rust/target/xcframeworks/libcel.xcframework ios/Frameworks/
+
+      - name: Replace Swift File
+        run: |
+          rm -rf ios/Sources/SuperCEL/cel.swift
+          mv rust/target/ios/cel.swift ios/Sources/SuperCEL/
+
+      - name: Commit and Push Changes
+        run: |
+          cd ios
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          git add .
+          git commit -m "Update framework"
+          git push origin main
