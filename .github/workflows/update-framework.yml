@@ -103,10 +103,11 @@ jobs:
 
       - name: Create GitHub Release
         uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ env.VERSION_NUMBER }}
           release_name: ${{ env.VERSION_NUMBER }}
           body: "This is an automatically generated release. Please see the [original Rust release](https://github.com/superwall/cel-evaluator-rs/releases/tag/${{ env.VERSION_NUMBER }}) for any version changes."
           draft: false
           prerelease: false
-          token: ${{ secrets.GITHUB_TOKEN }}
