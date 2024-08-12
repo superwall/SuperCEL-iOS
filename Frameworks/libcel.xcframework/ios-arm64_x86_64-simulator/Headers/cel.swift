@@ -420,7 +420,7 @@ private struct FfiConverterString: FfiConverter {
 }
 
 public protocol HostContext: AnyObject {
-    func computedProperty(name: String) -> String
+    func computedProperty(name: String, args: String) -> String
 }
 
 // Magic number for the Rust proxy to call using the same mechanism as every other method,
@@ -439,6 +439,7 @@ private enum UniffiCallbackInterfaceHostContext {
         computedProperty: { (
             uniffiHandle: UInt64,
             name: RustBuffer,
+            args: RustBuffer,
             uniffiOutReturn: UnsafeMutablePointer<RustBuffer>,
             uniffiCallStatus: UnsafeMutablePointer<RustCallStatus>
         ) in
@@ -448,7 +449,8 @@ private enum UniffiCallbackInterfaceHostContext {
                     throw UniffiInternalError.unexpectedStaleHandle
                 }
                 return try uniffiObj.computedProperty(
-                    name: FfiConverterString.lift(name)
+                    name: FfiConverterString.lift(name),
+                    args: FfiConverterString.lift(args)
                 )
             }
 
@@ -499,6 +501,23 @@ extension FfiConverterCallbackInterfaceHostContext: FfiConverter {
     }
 }
 
+public func evaluateAst(ast: String) -> String {
+    return try! FfiConverterString.lift(try! rustCall {
+        uniffi_cel_eval_fn_func_evaluate_ast(
+            FfiConverterString.lower(ast), $0
+        )
+    })
+}
+
+public func evaluateAstWithContext(definition: String, context: HostContext) -> String {
+    return try! FfiConverterString.lift(try! rustCall {
+        uniffi_cel_eval_fn_func_evaluate_ast_with_context(
+            FfiConverterString.lower(definition),
+            FfiConverterCallbackInterfaceHostContext.lower(context), $0
+        )
+    })
+}
+
 public func evaluateWithContext(definition: String, context: HostContext) -> String {
     return try! FfiConverterString.lift(try! rustCall {
         uniffi_cel_eval_fn_func_evaluate_with_context(
@@ -524,10 +543,16 @@ private var initializationResult: InitializationResult = {
     if bindings_contract_version != scaffolding_contract_version {
         return InitializationResult.contractVersionMismatch
     }
+    if uniffi_cel_eval_checksum_func_evaluate_ast() != 54749 {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if uniffi_cel_eval_checksum_func_evaluate_ast_with_context() != 12617 {
+        return InitializationResult.apiChecksumMismatch
+    }
     if uniffi_cel_eval_checksum_func_evaluate_with_context() != 36836 {
         return InitializationResult.apiChecksumMismatch
     }
-    if uniffi_cel_eval_checksum_method_hostcontext_computed_property() != 16648 {
+    if uniffi_cel_eval_checksum_method_hostcontext_computed_property() != 19093 {
         return InitializationResult.apiChecksumMismatch
     }
 

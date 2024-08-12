@@ -253,7 +253,7 @@ typedef void (*UniffiForeignFutureCompleteVoid)(uint64_t, UniffiForeignFutureStr
 #endif
 #ifndef UNIFFI_FFIDEF_CALLBACK_INTERFACE_HOST_CONTEXT_METHOD0
 #define UNIFFI_FFIDEF_CALLBACK_INTERFACE_HOST_CONTEXT_METHOD0
-typedef void (*UniffiCallbackInterfaceHostContextMethod0)(uint64_t, RustBuffer, RustBuffer* _Nonnull, 
+typedef void (*UniffiCallbackInterfaceHostContextMethod0)(uint64_t, RustBuffer, RustBuffer, RustBuffer* _Nonnull, 
         RustCallStatus *_Nonnull uniffiCallStatus
     );
 
@@ -269,6 +269,16 @@ typedef struct UniffiVTableCallbackInterfaceHostContext {
 #ifndef UNIFFI_FFIDEF_UNIFFI_CEL_EVAL_FN_INIT_CALLBACK_VTABLE_HOSTCONTEXT
 #define UNIFFI_FFIDEF_UNIFFI_CEL_EVAL_FN_INIT_CALLBACK_VTABLE_HOSTCONTEXT
 void uniffi_cel_eval_fn_init_callback_vtable_hostcontext(UniffiVTableCallbackInterfaceHostContext* _Nonnull vtable
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_CEL_EVAL_FN_FUNC_EVALUATE_AST
+#define UNIFFI_FFIDEF_UNIFFI_CEL_EVAL_FN_FUNC_EVALUATE_AST
+RustBuffer uniffi_cel_eval_fn_func_evaluate_ast(RustBuffer ast, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_CEL_EVAL_FN_FUNC_EVALUATE_AST_WITH_CONTEXT
+#define UNIFFI_FFIDEF_UNIFFI_CEL_EVAL_FN_FUNC_EVALUATE_AST_WITH_CONTEXT
+RustBuffer uniffi_cel_eval_fn_func_evaluate_ast_with_context(RustBuffer definition, uint64_t context, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_CEL_EVAL_FN_FUNC_EVALUATE_WITH_CONTEXT
@@ -554,6 +564,18 @@ void ffi_cel_eval_rust_future_free_void(uint64_t handle
 #ifndef UNIFFI_FFIDEF_FFI_CEL_EVAL_RUST_FUTURE_COMPLETE_VOID
 #define UNIFFI_FFIDEF_FFI_CEL_EVAL_RUST_FUTURE_COMPLETE_VOID
 void ffi_cel_eval_rust_future_complete_void(uint64_t handle, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_CEL_EVAL_CHECKSUM_FUNC_EVALUATE_AST
+#define UNIFFI_FFIDEF_UNIFFI_CEL_EVAL_CHECKSUM_FUNC_EVALUATE_AST
+uint16_t uniffi_cel_eval_checksum_func_evaluate_ast(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_CEL_EVAL_CHECKSUM_FUNC_EVALUATE_AST_WITH_CONTEXT
+#define UNIFFI_FFIDEF_UNIFFI_CEL_EVAL_CHECKSUM_FUNC_EVALUATE_AST_WITH_CONTEXT
+uint16_t uniffi_cel_eval_checksum_func_evaluate_ast_with_context(void
+    
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_CEL_EVAL_CHECKSUM_FUNC_EVALUATE_WITH_CONTEXT
