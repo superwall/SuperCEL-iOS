@@ -1,6 +1,6 @@
 # SuperCEL-iOS
 
-This is the iOS package for our Common Expression Language evaluator built with Rust ([view GitHub repo here](https://github.com/superwall/cel-evaluator-rs)).
+This is the iOS package for Superwall's Common Expression Language evaluator built with Rust ([view GitHub repo here](https://github.com/superwall/cel-evaluator-rs)).
 
 It is auto-compiled from a GitHub action whenever the Rust repo's master branch has 
 
