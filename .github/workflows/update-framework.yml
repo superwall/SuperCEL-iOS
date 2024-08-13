@@ -86,6 +86,10 @@ jobs:
           rm -rf ios/Sources/SuperCEL/cel.swift
           mv rust/target/ios/cel.swift ios/Sources/SuperCEL/
 
+      - name: Update Podspec Version
+        run: |
+          sed -i '' "s/s.version          = \".*\"/s.version          = \"${{ env.VERSION_NUMBER }}\"/" ios/SuperCEL.podspec
+
       - name: Commit and Push Changes
         run: |
           cd ios
@@ -100,6 +104,12 @@ jobs:
           git tag -a "${{ env.VERSION_NUMBER }}" -m "Release version ${{ env.VERSION_NUMBER }}"
           git push origin "${{ env.VERSION_NUMBER }}"
         working-directory: ios
+
+      - name: Publish to CocoaPod register
+        env:
+          COCOAPODS_TRUNK_TOKEN: ${{ secrets.COCOAPODS_TRUNK_TOKEN }}
+        run: |
+          pod trunk push SuperCEL.podspec --allow-warnings
 
       - name: Create GitHub Release
         uses: actions/create-release@v1
