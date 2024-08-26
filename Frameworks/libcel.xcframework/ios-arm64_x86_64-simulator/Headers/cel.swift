@@ -50,9 +50,11 @@ private extension ForeignBytes {
 
 private extension Data {
     init(rustBuffer: RustBuffer) {
-        // TODO: This copies the buffer. Can we read directly from a
-        // Rust buffer?
-        self.init(bytes: rustBuffer.data!, count: Int(rustBuffer.len))
+        self.init(
+            bytesNoCopy: rustBuffer.data!,
+            count: Int(rustBuffer.len),
+            deallocator: .none
+        )
     }
 }
 
@@ -419,85 +421,150 @@ private struct FfiConverterString: FfiConverter {
     }
 }
 
-public protocol HostContext: AnyObject {
-    func computedProperty(name: String, args: String) -> String
+public protocol HostContextProtocol: AnyObject {
+    func computedProperty(name: String, args: String) async -> String
 }
 
-// Magic number for the Rust proxy to call using the same mechanism as every other method,
-// to free the callback once it's dropped by Rust.
-private let IDX_CALLBACK_FREE: Int32 = 0
-// Callback return codes
-private let UNIFFI_CALLBACK_SUCCESS: Int32 = 0
-private let UNIFFI_CALLBACK_ERROR: Int32 = 1
-private let UNIFFI_CALLBACK_UNEXPECTED_ERROR: Int32 = 2
+open class HostContext:
+    HostContextProtocol
+{
+    fileprivate let pointer: UnsafeMutableRawPointer!
 
-// Put the implementation in a struct so we don't pollute the top-level namespace
-private enum UniffiCallbackInterfaceHostContext {
-    // Create the VTable using a series of closures.
-    // Swift automatically converts these into C callback functions.
-    static var vtable: UniffiVTableCallbackInterfaceHostContext = .init(
-        computedProperty: { (
-            uniffiHandle: UInt64,
-            name: RustBuffer,
-            args: RustBuffer,
-            uniffiOutReturn: UnsafeMutablePointer<RustBuffer>,
-            uniffiCallStatus: UnsafeMutablePointer<RustCallStatus>
-        ) in
-            let makeCall = {
-                () throws -> String in
-                guard let uniffiObj = try? FfiConverterCallbackInterfaceHostContext.handleMap.get(handle: uniffiHandle) else {
-                    throw UniffiInternalError.unexpectedStaleHandle
-                }
-                return try uniffiObj.computedProperty(
-                    name: FfiConverterString.lift(name),
-                    args: FfiConverterString.lift(args)
-                )
-            }
+    /// Used to instantiate a [FFIObject] without an actual pointer, for fakes in tests, mostly.
+    public struct NoPointer {
+        public init() {}
+    }
 
-            let writeReturn = { uniffiOutReturn.pointee = FfiConverterString.lower($0) }
-            uniffiTraitInterfaceCall(
-                callStatus: uniffiCallStatus,
-                makeCall: makeCall,
-                writeReturn: writeReturn
-            )
-        },
-        uniffiFree: { (uniffiHandle: UInt64) in
-            let result = try? FfiConverterCallbackInterfaceHostContext.handleMap.remove(handle: uniffiHandle)
-            if result == nil {
-                print("Uniffi callback interface HostContext: handle missing in uniffiFree")
-            }
+    // TODO: We'd like this to be `private` but for Swifty reasons,
+    // we can't implement `FfiConverter` without making this `required` and we can't
+    // make it `required` without making it `public`.
+    public required init(unsafeFromRawPointer pointer: UnsafeMutableRawPointer) {
+        self.pointer = pointer
+    }
+
+    /// This constructor can be used to instantiate a fake object.
+    /// - Parameter noPointer: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
+    ///
+    /// - Warning:
+    ///     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing [Pointer] the FFI lower functions will crash.
+    public init(noPointer _: NoPointer) {
+        pointer = nil
+    }
+
+    public func uniffiClonePointer() -> UnsafeMutableRawPointer {
+        return try! rustCall { uniffi_cel_eval_fn_clone_hostcontext(self.pointer, $0) }
+    }
+
+    // No primary constructor declared for this class.
+
+    deinit {
+        guard let pointer = pointer else {
+            return
         }
-    )
+
+        try! rustCall { uniffi_cel_eval_fn_free_hostcontext(pointer, $0) }
+    }
+
+    open func computedProperty(name: String, args: String) async -> String {
+        return
+            try! await uniffiRustCallAsync(
+                rustFutureFunc: {
+                    uniffi_cel_eval_fn_method_hostcontext_computed_property(
+                        self.uniffiClonePointer(),
+                        FfiConverterString.lower(name), FfiConverterString.lower(args)
+                    )
+                },
+                pollFunc: ffi_cel_eval_rust_future_poll_rust_buffer,
+                completeFunc: ffi_cel_eval_rust_future_complete_rust_buffer,
+                freeFunc: ffi_cel_eval_rust_future_free_rust_buffer,
+                liftFunc: FfiConverterString.lift,
+                errorHandler: nil
+            )
+    }
 }
 
-private func uniffiCallbackInitHostContext() {
-    uniffi_cel_eval_fn_init_callback_vtable_hostcontext(&UniffiCallbackInterfaceHostContext.vtable)
-}
-
-// FfiConverter protocol for callback interfaces
-private enum FfiConverterCallbackInterfaceHostContext {
-    fileprivate static var handleMap = UniffiHandleMap<HostContext>()
-}
-
-extension FfiConverterCallbackInterfaceHostContext: FfiConverter {
+public struct FfiConverterTypeHostContext: FfiConverter {
+    typealias FfiType = UnsafeMutableRawPointer
     typealias SwiftType = HostContext
-    typealias FfiType = UInt64
 
-    public static func lift(_ handle: UInt64) throws -> SwiftType {
-        try handleMap.get(handle: handle)
+    public static func lift(_ pointer: UnsafeMutableRawPointer) throws -> HostContext {
+        return HostContext(unsafeFromRawPointer: pointer)
     }
 
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
-        let handle: UInt64 = try readInt(&buf)
-        return try lift(handle)
+    public static func lower(_ value: HostContext) -> UnsafeMutableRawPointer {
+        return value.uniffiClonePointer()
     }
 
-    public static func lower(_ v: SwiftType) -> UInt64 {
-        return handleMap.insert(obj: v)
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> HostContext {
+        let v: UInt64 = try readInt(&buf)
+        // The Rust code won't compile if a pointer won't fit in a UInt64.
+        // We have to go via `UInt` because that's the thing that's the size of a pointer.
+        let ptr = UnsafeMutableRawPointer(bitPattern: UInt(truncatingIfNeeded: v))
+        if ptr == nil {
+            throw UniffiInternalError.unexpectedNullPointer
+        }
+        return try lift(ptr!)
     }
 
-    public static func write(_ v: SwiftType, into buf: inout [UInt8]) {
-        writeInt(&buf, lower(v))
+    public static func write(_ value: HostContext, into buf: inout [UInt8]) {
+        // This fiddling is because `Int` is the thing that's the same size as a pointer.
+        // The Rust code won't compile if a pointer won't fit in a `UInt64`.
+        writeInt(&buf, UInt64(bitPattern: Int64(Int(bitPattern: lower(value)))))
+    }
+}
+
+public func FfiConverterTypeHostContext_lift(_ pointer: UnsafeMutableRawPointer) throws -> HostContext {
+    return try FfiConverterTypeHostContext.lift(pointer)
+}
+
+public func FfiConverterTypeHostContext_lower(_ value: HostContext) -> UnsafeMutableRawPointer {
+    return FfiConverterTypeHostContext.lower(value)
+}
+
+private let UNIFFI_RUST_FUTURE_POLL_READY: Int8 = 0
+private let UNIFFI_RUST_FUTURE_POLL_MAYBE_READY: Int8 = 1
+
+private let uniffiContinuationHandleMap = UniffiHandleMap<UnsafeContinuation<Int8, Never>>()
+
+private func uniffiRustCallAsync<F, T>(
+    rustFutureFunc: () -> UInt64,
+    pollFunc: (UInt64, @escaping UniffiRustFutureContinuationCallback, UInt64) -> Void,
+    completeFunc: (UInt64, UnsafeMutablePointer<RustCallStatus>) -> F,
+    freeFunc: (UInt64) -> Void,
+    liftFunc: (F) throws -> T,
+    errorHandler: ((RustBuffer) throws -> Swift.Error)?
+) async throws -> T {
+    // Make sure to call uniffiEnsureInitialized() since future creation doesn't have a
+    // RustCallStatus param, so doesn't use makeRustCall()
+    uniffiEnsureInitialized()
+    let rustFuture = rustFutureFunc()
+    defer {
+        freeFunc(rustFuture)
+    }
+    var pollResult: Int8
+    repeat {
+        pollResult = await withUnsafeContinuation {
+            pollFunc(
+                rustFuture,
+                uniffiFutureContinuationCallback,
+                uniffiContinuationHandleMap.insert(obj: $0)
+            )
+        }
+    } while pollResult != UNIFFI_RUST_FUTURE_POLL_READY
+
+    return try liftFunc(makeRustCall(
+        { completeFunc(rustFuture, $0) },
+        errorHandler: errorHandler
+    ))
+}
+
+// Callback handlers for an async calls.  These are invoked by Rust when the future is ready.  They
+// lift the return value or error and resume the suspended function.
+private func uniffiFutureContinuationCallback(handle: UInt64, pollResult: Int8) {
+    if let continuation = try? uniffiContinuationHandleMap.remove(handle: handle) {
+        continuation.resume(returning: pollResult)
+    } else {
+        print("uniffiFutureContinuationCallback invalid handle")
     }
 }
 
@@ -513,7 +580,7 @@ public func evaluateAstWithContext(definition: String, context: HostContext) -> 
     return try! FfiConverterString.lift(try! rustCall {
         uniffi_cel_eval_fn_func_evaluate_ast_with_context(
             FfiConverterString.lower(definition),
-            FfiConverterCallbackInterfaceHostContext.lower(context), $0
+            FfiConverterTypeHostContext.lower(context), $0
         )
     })
 }
@@ -522,7 +589,7 @@ public func evaluateWithContext(definition: String, context: HostContext) -> Str
     return try! FfiConverterString.lift(try! rustCall {
         uniffi_cel_eval_fn_func_evaluate_with_context(
             FfiConverterString.lower(definition),
-            FfiConverterCallbackInterfaceHostContext.lower(context), $0
+            FfiConverterTypeHostContext.lower(context), $0
         )
     })
 }
@@ -546,17 +613,16 @@ private var initializationResult: InitializationResult = {
     if uniffi_cel_eval_checksum_func_evaluate_ast() != 54749 {
         return InitializationResult.apiChecksumMismatch
     }
-    if uniffi_cel_eval_checksum_func_evaluate_ast_with_context() != 12617 {
+    if uniffi_cel_eval_checksum_func_evaluate_ast_with_context() != 42214 {
         return InitializationResult.apiChecksumMismatch
     }
-    if uniffi_cel_eval_checksum_func_evaluate_with_context() != 36836 {
+    if uniffi_cel_eval_checksum_func_evaluate_with_context() != 38201 {
         return InitializationResult.apiChecksumMismatch
     }
-    if uniffi_cel_eval_checksum_method_hostcontext_computed_property() != 19093 {
+    if uniffi_cel_eval_checksum_method_hostcontext_computed_property() != 18666 {
         return InitializationResult.apiChecksumMismatch
     }
 
-    uniffiCallbackInitHostContext()
     return InitializationResult.ok
 }()
 

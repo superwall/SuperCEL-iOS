@@ -253,8 +253,7 @@ typedef void (*UniffiForeignFutureCompleteVoid)(uint64_t, UniffiForeignFutureStr
 #endif
 #ifndef UNIFFI_FFIDEF_CALLBACK_INTERFACE_HOST_CONTEXT_METHOD0
 #define UNIFFI_FFIDEF_CALLBACK_INTERFACE_HOST_CONTEXT_METHOD0
-typedef void (*UniffiCallbackInterfaceHostContextMethod0)(uint64_t, RustBuffer, RustBuffer, RustBuffer* _Nonnull, 
-        RustCallStatus *_Nonnull uniffiCallStatus
+typedef void (*UniffiCallbackInterfaceHostContextMethod0)(uint64_t, RustBuffer, RustBuffer, UniffiForeignFutureCompleteRustBuffer _Nonnull, uint64_t, UniffiForeignFuture* _Nonnull
     );
 
 #endif
@@ -266,9 +265,19 @@ typedef struct UniffiVTableCallbackInterfaceHostContext {
 } UniffiVTableCallbackInterfaceHostContext;
 
 #endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_CEL_EVAL_FN_INIT_CALLBACK_VTABLE_HOSTCONTEXT
-#define UNIFFI_FFIDEF_UNIFFI_CEL_EVAL_FN_INIT_CALLBACK_VTABLE_HOSTCONTEXT
-void uniffi_cel_eval_fn_init_callback_vtable_hostcontext(UniffiVTableCallbackInterfaceHostContext* _Nonnull vtable
+#ifndef UNIFFI_FFIDEF_UNIFFI_CEL_EVAL_FN_CLONE_HOSTCONTEXT
+#define UNIFFI_FFIDEF_UNIFFI_CEL_EVAL_FN_CLONE_HOSTCONTEXT
+void*_Nonnull uniffi_cel_eval_fn_clone_hostcontext(void*_Nonnull ptr, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_CEL_EVAL_FN_FREE_HOSTCONTEXT
+#define UNIFFI_FFIDEF_UNIFFI_CEL_EVAL_FN_FREE_HOSTCONTEXT
+void uniffi_cel_eval_fn_free_hostcontext(void*_Nonnull ptr, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_CEL_EVAL_FN_METHOD_HOSTCONTEXT_COMPUTED_PROPERTY
+#define UNIFFI_FFIDEF_UNIFFI_CEL_EVAL_FN_METHOD_HOSTCONTEXT_COMPUTED_PROPERTY
+uint64_t uniffi_cel_eval_fn_method_hostcontext_computed_property(void*_Nonnull ptr, RustBuffer name, RustBuffer args
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_CEL_EVAL_FN_FUNC_EVALUATE_AST
@@ -278,12 +287,12 @@ RustBuffer uniffi_cel_eval_fn_func_evaluate_ast(RustBuffer ast, RustCallStatus *
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_CEL_EVAL_FN_FUNC_EVALUATE_AST_WITH_CONTEXT
 #define UNIFFI_FFIDEF_UNIFFI_CEL_EVAL_FN_FUNC_EVALUATE_AST_WITH_CONTEXT
-RustBuffer uniffi_cel_eval_fn_func_evaluate_ast_with_context(RustBuffer definition, uint64_t context, RustCallStatus *_Nonnull out_status
+RustBuffer uniffi_cel_eval_fn_func_evaluate_ast_with_context(RustBuffer definition, void*_Nonnull context, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_CEL_EVAL_FN_FUNC_EVALUATE_WITH_CONTEXT
 #define UNIFFI_FFIDEF_UNIFFI_CEL_EVAL_FN_FUNC_EVALUATE_WITH_CONTEXT
-RustBuffer uniffi_cel_eval_fn_func_evaluate_with_context(RustBuffer definition, uint64_t context, RustCallStatus *_Nonnull out_status
+RustBuffer uniffi_cel_eval_fn_func_evaluate_with_context(RustBuffer definition, void*_Nonnull context, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_FFI_CEL_EVAL_RUSTBUFFER_ALLOC
