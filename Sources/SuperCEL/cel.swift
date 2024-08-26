@@ -421,12 +421,12 @@ private struct FfiConverterString: FfiConverter {
     }
 }
 
-public protocol HostContextProtocol: AnyObject {
+public protocol HostContext: AnyObject {
     func computedProperty(name: String, args: String) async -> String
 }
 
-open class HostContext:
-    HostContextProtocol
+open class HostContextImpl:
+    HostContext
 {
     fileprivate let pointer: UnsafeMutableRawPointer!
 
@@ -483,16 +483,91 @@ open class HostContext:
     }
 }
 
+// Magic number for the Rust proxy to call using the same mechanism as every other method,
+// to free the callback once it's dropped by Rust.
+private let IDX_CALLBACK_FREE: Int32 = 0
+// Callback return codes
+private let UNIFFI_CALLBACK_SUCCESS: Int32 = 0
+private let UNIFFI_CALLBACK_ERROR: Int32 = 1
+private let UNIFFI_CALLBACK_UNEXPECTED_ERROR: Int32 = 2
+
+// Put the implementation in a struct so we don't pollute the top-level namespace
+private enum UniffiCallbackInterfaceHostContext {
+    // Create the VTable using a series of closures.
+    // Swift automatically converts these into C callback functions.
+    static var vtable: UniffiVTableCallbackInterfaceHostContext = .init(
+        computedProperty: { (
+            uniffiHandle: UInt64,
+            name: RustBuffer,
+            args: RustBuffer,
+            uniffiFutureCallback: @escaping UniffiForeignFutureCompleteRustBuffer,
+            uniffiCallbackData: UInt64,
+            uniffiOutReturn: UnsafeMutablePointer<UniffiForeignFuture>
+        ) in
+            let makeCall = {
+                () async throws -> String in
+                guard let uniffiObj = try? FfiConverterTypeHostContext.handleMap.get(handle: uniffiHandle) else {
+                    throw UniffiInternalError.unexpectedStaleHandle
+                }
+                return try await uniffiObj.computedProperty(
+                    name: FfiConverterString.lift(name),
+                    args: FfiConverterString.lift(args)
+                )
+            }
+
+            let uniffiHandleSuccess = { (returnValue: String) in
+                uniffiFutureCallback(
+                    uniffiCallbackData,
+                    UniffiForeignFutureStructRustBuffer(
+                        returnValue: FfiConverterString.lower(returnValue),
+                        callStatus: RustCallStatus()
+                    )
+                )
+            }
+            let uniffiHandleError = { statusCode, errorBuf in
+                uniffiFutureCallback(
+                    uniffiCallbackData,
+                    UniffiForeignFutureStructRustBuffer(
+                        returnValue: RustBuffer.empty(),
+                        callStatus: RustCallStatus(code: statusCode, errorBuf: errorBuf)
+                    )
+                )
+            }
+            let uniffiForeignFuture = uniffiTraitInterfaceCallAsync(
+                makeCall: makeCall,
+                handleSuccess: uniffiHandleSuccess,
+                handleError: uniffiHandleError
+            )
+            uniffiOutReturn.pointee = uniffiForeignFuture
+        },
+        uniffiFree: { (uniffiHandle: UInt64) in
+            let result = try? FfiConverterTypeHostContext.handleMap.remove(handle: uniffiHandle)
+            if result == nil {
+                print("Uniffi callback interface HostContext: handle missing in uniffiFree")
+            }
+        }
+    )
+}
+
+private func uniffiCallbackInitHostContext() {
+    uniffi_cel_eval_fn_init_callback_vtable_hostcontext(&UniffiCallbackInterfaceHostContext.vtable)
+}
+
 public struct FfiConverterTypeHostContext: FfiConverter {
+    fileprivate static var handleMap = UniffiHandleMap<HostContext>()
+
     typealias FfiType = UnsafeMutableRawPointer
     typealias SwiftType = HostContext
 
     public static func lift(_ pointer: UnsafeMutableRawPointer) throws -> HostContext {
-        return HostContext(unsafeFromRawPointer: pointer)
+        return HostContextImpl(unsafeFromRawPointer: pointer)
     }
 
     public static func lower(_ value: HostContext) -> UnsafeMutableRawPointer {
-        return value.uniffiClonePointer()
+        guard let ptr = UnsafeMutableRawPointer(bitPattern: UInt(truncatingIfNeeded: handleMap.insert(obj: value))) else {
+            fatalError("Cast to UnsafeMutableRawPointer failed")
+        }
+        return ptr
     }
 
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> HostContext {
@@ -568,6 +643,72 @@ private func uniffiFutureContinuationCallback(handle: UInt64, pollResult: Int8) 
     }
 }
 
+private func uniffiTraitInterfaceCallAsync<T>(
+    makeCall: @escaping () async throws -> T,
+    handleSuccess: @escaping (T) -> Void,
+    handleError: @escaping (Int8, RustBuffer) -> Void
+) -> UniffiForeignFuture {
+    let task = Task {
+        do {
+            try handleSuccess(await makeCall())
+        } catch {
+            handleError(CALL_UNEXPECTED_ERROR, FfiConverterString.lower(String(describing: error)))
+        }
+    }
+    let handle = UNIFFI_FOREIGN_FUTURE_HANDLE_MAP.insert(obj: task)
+    return UniffiForeignFuture(handle: handle, free: uniffiForeignFutureFree)
+}
+
+private func uniffiTraitInterfaceCallAsyncWithError<T, E>(
+    makeCall: @escaping () async throws -> T,
+    handleSuccess: @escaping (T) -> Void,
+    handleError: @escaping (Int8, RustBuffer) -> Void,
+    lowerError: @escaping (E) -> RustBuffer
+) -> UniffiForeignFuture {
+    let task = Task {
+        do {
+            try handleSuccess(await makeCall())
+        } catch let error as E {
+            handleError(CALL_ERROR, lowerError(error))
+        } catch {
+            handleError(CALL_UNEXPECTED_ERROR, FfiConverterString.lower(String(describing: error)))
+        }
+    }
+    let handle = UNIFFI_FOREIGN_FUTURE_HANDLE_MAP.insert(obj: task)
+    return UniffiForeignFuture(handle: handle, free: uniffiForeignFutureFree)
+}
+
+// Borrow the callback handle map implementation to store foreign future handles
+// TODO: consolidate the handle-map code (https://github.com/mozilla/uniffi-rs/pull/1823)
+private var UNIFFI_FOREIGN_FUTURE_HANDLE_MAP = UniffiHandleMap<UniffiForeignFutureTask>()
+
+// Protocol for tasks that handle foreign futures.
+//
+// Defining a protocol allows all tasks to be stored in the same handle map.  This can't be done
+// with the task object itself, since has generic parameters.
+protocol UniffiForeignFutureTask {
+    func cancel()
+}
+
+extension Task: UniffiForeignFutureTask {}
+
+private func uniffiForeignFutureFree(handle: UInt64) {
+    do {
+        let task = try UNIFFI_FOREIGN_FUTURE_HANDLE_MAP.remove(handle: handle)
+        // Set the cancellation flag on the task.  If it's still running, the code can check the
+        // cancellation flag or call `Task.checkCancellation()`.  If the task has completed, this is
+        // a no-op.
+        task.cancel()
+    } catch {
+        print("uniffiForeignFutureFree: handle missing from handlemap")
+    }
+}
+
+// For testing
+public func uniffiForeignFutureHandleCountCel() -> Int {
+    UNIFFI_FOREIGN_FUTURE_HANDLE_MAP.count
+}
+
 public func evaluateAst(ast: String) -> String {
     return try! FfiConverterString.lift(try! rustCall {
         uniffi_cel_eval_fn_func_evaluate_ast(
@@ -613,16 +754,17 @@ private var initializationResult: InitializationResult = {
     if uniffi_cel_eval_checksum_func_evaluate_ast() != 54749 {
         return InitializationResult.apiChecksumMismatch
     }
-    if uniffi_cel_eval_checksum_func_evaluate_ast_with_context() != 42214 {
+    if uniffi_cel_eval_checksum_func_evaluate_ast_with_context() != 28567 {
         return InitializationResult.apiChecksumMismatch
     }
-    if uniffi_cel_eval_checksum_func_evaluate_with_context() != 38201 {
+    if uniffi_cel_eval_checksum_func_evaluate_with_context() != 37319 {
         return InitializationResult.apiChecksumMismatch
     }
-    if uniffi_cel_eval_checksum_method_hostcontext_computed_property() != 18666 {
+    if uniffi_cel_eval_checksum_method_hostcontext_computed_property() != 23284 {
         return InitializationResult.apiChecksumMismatch
     }
 
+    uniffiCallbackInitHostContext()
     return InitializationResult.ok
 }()
 

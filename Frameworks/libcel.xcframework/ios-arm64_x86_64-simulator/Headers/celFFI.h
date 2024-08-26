@@ -275,6 +275,11 @@ void*_Nonnull uniffi_cel_eval_fn_clone_hostcontext(void*_Nonnull ptr, RustCallSt
 void uniffi_cel_eval_fn_free_hostcontext(void*_Nonnull ptr, RustCallStatus *_Nonnull out_status
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_CEL_EVAL_FN_INIT_CALLBACK_VTABLE_HOSTCONTEXT
+#define UNIFFI_FFIDEF_UNIFFI_CEL_EVAL_FN_INIT_CALLBACK_VTABLE_HOSTCONTEXT
+void uniffi_cel_eval_fn_init_callback_vtable_hostcontext(UniffiVTableCallbackInterfaceHostContext* _Nonnull vtable
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_CEL_EVAL_FN_METHOD_HOSTCONTEXT_COMPUTED_PROPERTY
 #define UNIFFI_FFIDEF_UNIFFI_CEL_EVAL_FN_METHOD_HOSTCONTEXT_COMPUTED_PROPERTY
 uint64_t uniffi_cel_eval_fn_method_hostcontext_computed_property(void*_Nonnull ptr, RustBuffer name, RustBuffer args
