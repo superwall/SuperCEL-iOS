@@ -5,6 +5,11 @@ import PackageDescription
 
 let package = Package(
   name: "SuperCEL",
+  platforms: [
+    .iOS(.v13),
+    .macOS(.v10_12),
+    .watchOS("6.2")
+  ],
   products: [
     // Products define the executables and libraries a package produces, making them visible to other packages.
     .library(
