@@ -110,6 +110,7 @@ jobs:
           COCOAPODS_TRUNK_TOKEN: ${{ secrets.COCOAPODS_TRUNK_TOKEN }}
         run: |
           pod trunk push SuperCEL.podspec --allow-warnings
+        working-directory: ios
 
       - name: Create GitHub Release
         uses: actions/create-release@v1
