@@ -257,10 +257,17 @@ typedef void (*UniffiCallbackInterfaceHostContextMethod0)(uint64_t, RustBuffer, 
     );
 
 #endif
+#ifndef UNIFFI_FFIDEF_CALLBACK_INTERFACE_HOST_CONTEXT_METHOD1
+#define UNIFFI_FFIDEF_CALLBACK_INTERFACE_HOST_CONTEXT_METHOD1
+typedef void (*UniffiCallbackInterfaceHostContextMethod1)(uint64_t, RustBuffer, RustBuffer, UniffiForeignFutureCompleteRustBuffer _Nonnull, uint64_t, UniffiForeignFuture* _Nonnull
+    );
+
+#endif
 #ifndef UNIFFI_FFIDEF_V_TABLE_CALLBACK_INTERFACE_HOST_CONTEXT
 #define UNIFFI_FFIDEF_V_TABLE_CALLBACK_INTERFACE_HOST_CONTEXT
 typedef struct UniffiVTableCallbackInterfaceHostContext {
     UniffiCallbackInterfaceHostContextMethod0 _Nonnull computedProperty;
+    UniffiCallbackInterfaceHostContextMethod1 _Nonnull deviceProperty;
     UniffiCallbackInterfaceFree _Nonnull uniffiFree;
 } UniffiVTableCallbackInterfaceHostContext;
 
@@ -285,6 +292,11 @@ void uniffi_cel_eval_fn_init_callback_vtable_hostcontext(UniffiVTableCallbackInt
 uint64_t uniffi_cel_eval_fn_method_hostcontext_computed_property(void*_Nonnull ptr, RustBuffer name, RustBuffer args
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_CEL_EVAL_FN_METHOD_HOSTCONTEXT_DEVICE_PROPERTY
+#define UNIFFI_FFIDEF_UNIFFI_CEL_EVAL_FN_METHOD_HOSTCONTEXT_DEVICE_PROPERTY
+uint64_t uniffi_cel_eval_fn_method_hostcontext_device_property(void*_Nonnull ptr, RustBuffer name, RustBuffer args
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_CEL_EVAL_FN_FUNC_EVALUATE_AST
 #define UNIFFI_FFIDEF_UNIFFI_CEL_EVAL_FN_FUNC_EVALUATE_AST
 RustBuffer uniffi_cel_eval_fn_func_evaluate_ast(RustBuffer ast, RustCallStatus *_Nonnull out_status
@@ -298,6 +310,11 @@ RustBuffer uniffi_cel_eval_fn_func_evaluate_ast_with_context(RustBuffer definiti
 #ifndef UNIFFI_FFIDEF_UNIFFI_CEL_EVAL_FN_FUNC_EVALUATE_WITH_CONTEXT
 #define UNIFFI_FFIDEF_UNIFFI_CEL_EVAL_FN_FUNC_EVALUATE_WITH_CONTEXT
 RustBuffer uniffi_cel_eval_fn_func_evaluate_with_context(RustBuffer definition, void*_Nonnull context, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_CEL_EVAL_FN_FUNC_PARSE_TO_AST
+#define UNIFFI_FFIDEF_UNIFFI_CEL_EVAL_FN_FUNC_PARSE_TO_AST
+RustBuffer uniffi_cel_eval_fn_func_parse_to_ast(RustBuffer expression, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_FFI_CEL_EVAL_RUSTBUFFER_ALLOC
@@ -598,9 +615,21 @@ uint16_t uniffi_cel_eval_checksum_func_evaluate_with_context(void
     
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_CEL_EVAL_CHECKSUM_FUNC_PARSE_TO_AST
+#define UNIFFI_FFIDEF_UNIFFI_CEL_EVAL_CHECKSUM_FUNC_PARSE_TO_AST
+uint16_t uniffi_cel_eval_checksum_func_parse_to_ast(void
+    
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_CEL_EVAL_CHECKSUM_METHOD_HOSTCONTEXT_COMPUTED_PROPERTY
 #define UNIFFI_FFIDEF_UNIFFI_CEL_EVAL_CHECKSUM_METHOD_HOSTCONTEXT_COMPUTED_PROPERTY
 uint16_t uniffi_cel_eval_checksum_method_hostcontext_computed_property(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_CEL_EVAL_CHECKSUM_METHOD_HOSTCONTEXT_DEVICE_PROPERTY
+#define UNIFFI_FFIDEF_UNIFFI_CEL_EVAL_CHECKSUM_METHOD_HOSTCONTEXT_DEVICE_PROPERTY
+uint16_t uniffi_cel_eval_checksum_method_hostcontext_device_property(void
     
 );
 #endif

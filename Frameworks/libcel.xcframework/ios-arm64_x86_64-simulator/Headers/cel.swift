@@ -423,6 +423,8 @@ private struct FfiConverterString: FfiConverter {
 
 public protocol HostContext: AnyObject {
     func computedProperty(name: String, args: String) async -> String
+
+    func deviceProperty(name: String, args: String) async -> String
 }
 
 open class HostContextImpl:
@@ -481,6 +483,23 @@ open class HostContextImpl:
                 errorHandler: nil
             )
     }
+
+    open func deviceProperty(name: String, args: String) async -> String {
+        return
+            try! await uniffiRustCallAsync(
+                rustFutureFunc: {
+                    uniffi_cel_eval_fn_method_hostcontext_device_property(
+                        self.uniffiClonePointer(),
+                        FfiConverterString.lower(name), FfiConverterString.lower(args)
+                    )
+                },
+                pollFunc: ffi_cel_eval_rust_future_poll_rust_buffer,
+                completeFunc: ffi_cel_eval_rust_future_complete_rust_buffer,
+                freeFunc: ffi_cel_eval_rust_future_free_rust_buffer,
+                liftFunc: FfiConverterString.lift,
+                errorHandler: nil
+            )
+    }
 }
 
 // Magic number for the Rust proxy to call using the same mechanism as every other method,
@@ -510,6 +529,50 @@ private enum UniffiCallbackInterfaceHostContext {
                     throw UniffiInternalError.unexpectedStaleHandle
                 }
                 return try await uniffiObj.computedProperty(
+                    name: FfiConverterString.lift(name),
+                    args: FfiConverterString.lift(args)
+                )
+            }
+
+            let uniffiHandleSuccess = { (returnValue: String) in
+                uniffiFutureCallback(
+                    uniffiCallbackData,
+                    UniffiForeignFutureStructRustBuffer(
+                        returnValue: FfiConverterString.lower(returnValue),
+                        callStatus: RustCallStatus()
+                    )
+                )
+            }
+            let uniffiHandleError = { statusCode, errorBuf in
+                uniffiFutureCallback(
+                    uniffiCallbackData,
+                    UniffiForeignFutureStructRustBuffer(
+                        returnValue: RustBuffer.empty(),
+                        callStatus: RustCallStatus(code: statusCode, errorBuf: errorBuf)
+                    )
+                )
+            }
+            let uniffiForeignFuture = uniffiTraitInterfaceCallAsync(
+                makeCall: makeCall,
+                handleSuccess: uniffiHandleSuccess,
+                handleError: uniffiHandleError
+            )
+            uniffiOutReturn.pointee = uniffiForeignFuture
+        },
+        deviceProperty: { (
+            uniffiHandle: UInt64,
+            name: RustBuffer,
+            args: RustBuffer,
+            uniffiFutureCallback: @escaping UniffiForeignFutureCompleteRustBuffer,
+            uniffiCallbackData: UInt64,
+            uniffiOutReturn: UnsafeMutablePointer<UniffiForeignFuture>
+        ) in
+            let makeCall = {
+                () async throws -> String in
+                guard let uniffiObj = try? FfiConverterTypeHostContext.handleMap.get(handle: uniffiHandle) else {
+                    throw UniffiInternalError.unexpectedStaleHandle
+                }
+                return try await uniffiObj.deviceProperty(
                     name: FfiConverterString.lift(name),
                     args: FfiConverterString.lift(args)
                 )
@@ -735,6 +798,14 @@ public func evaluateWithContext(definition: String, context: HostContext) -> Str
     })
 }
 
+public func parseToAst(expression: String) -> String {
+    return try! FfiConverterString.lift(try! rustCall {
+        uniffi_cel_eval_fn_func_parse_to_ast(
+            FfiConverterString.lower(expression), $0
+        )
+    })
+}
+
 private enum InitializationResult {
     case ok
     case contractVersionMismatch
@@ -760,7 +831,13 @@ private var initializationResult: InitializationResult = {
     if uniffi_cel_eval_checksum_func_evaluate_with_context() != 37319 {
         return InitializationResult.apiChecksumMismatch
     }
+    if uniffi_cel_eval_checksum_func_parse_to_ast() != 40465 {
+        return InitializationResult.apiChecksumMismatch
+    }
     if uniffi_cel_eval_checksum_method_hostcontext_computed_property() != 23284 {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if uniffi_cel_eval_checksum_method_hostcontext_device_property() != 48756 {
         return InitializationResult.apiChecksumMismatch
     }
 
