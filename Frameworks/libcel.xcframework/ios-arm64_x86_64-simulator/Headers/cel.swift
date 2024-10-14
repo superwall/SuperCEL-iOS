@@ -170,10 +170,16 @@ private protocol FfiConverter {
 private protocol FfiConverterPrimitive: FfiConverter where FfiType == SwiftType {}
 
 extension FfiConverterPrimitive {
+    #if swift(>=5.8)
+        @_documentation(visibility: private)
+    #endif
     public static func lift(_ value: FfiType) throws -> SwiftType {
         return value
     }
 
+    #if swift(>=5.8)
+        @_documentation(visibility: private)
+    #endif
     public static func lower(_ value: SwiftType) -> FfiType {
         return value
     }
@@ -184,6 +190,9 @@ extension FfiConverterPrimitive {
 private protocol FfiConverterRustBuffer: FfiConverter where FfiType == RustBuffer {}
 
 extension FfiConverterRustBuffer {
+    #if swift(>=5.8)
+        @_documentation(visibility: private)
+    #endif
     public static func lift(_ buf: RustBuffer) throws -> SwiftType {
         var reader = createReader(data: Data(rustBuffer: buf))
         let value = try read(from: &reader)
@@ -194,6 +203,9 @@ extension FfiConverterRustBuffer {
         return value
     }
 
+    #if swift(>=5.8)
+        @_documentation(visibility: private)
+    #endif
     public static func lower(_ value: SwiftType) -> RustBuffer {
         var writer = createWriter()
         write(value, into: &writer)
@@ -383,6 +395,9 @@ private class UniffiHandleMap<T> {
 
 // Public interface members begin here.
 
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
 private struct FfiConverterString: FfiConverter {
     typealias SwiftType = String
     typealias FfiType = RustBuffer
@@ -433,6 +448,9 @@ open class HostContextImpl:
     fileprivate let pointer: UnsafeMutableRawPointer!
 
     /// Used to instantiate a [FFIObject] without an actual pointer, for fakes in tests, mostly.
+    #if swift(>=5.8)
+        @_documentation(visibility: private)
+    #endif
     public struct NoPointer {
         public init() {}
     }
@@ -444,15 +462,21 @@ open class HostContextImpl:
         self.pointer = pointer
     }
 
-    /// This constructor can be used to instantiate a fake object.
-    /// - Parameter noPointer: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
-    ///
-    /// - Warning:
-    ///     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing [Pointer] the FFI lower functions will crash.
+    // This constructor can be used to instantiate a fake object.
+    // - Parameter noPointer: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
+    //
+    // - Warning:
+    //     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing [Pointer] the FFI lower functions will crash.
+    #if swift(>=5.8)
+        @_documentation(visibility: private)
+    #endif
     public init(noPointer _: NoPointer) {
         pointer = nil
     }
 
+    #if swift(>=5.8)
+        @_documentation(visibility: private)
+    #endif
     public func uniffiClonePointer() -> UnsafeMutableRawPointer {
         return try! rustCall { uniffi_cel_eval_fn_clone_hostcontext(self.pointer, $0) }
     }
@@ -616,6 +640,9 @@ private func uniffiCallbackInitHostContext() {
     uniffi_cel_eval_fn_init_callback_vtable_hostcontext(&UniffiCallbackInterfaceHostContext.vtable)
 }
 
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
 public struct FfiConverterTypeHostContext: FfiConverter {
     fileprivate static var handleMap = UniffiHandleMap<HostContext>()
 
@@ -651,10 +678,16 @@ public struct FfiConverterTypeHostContext: FfiConverter {
     }
 }
 
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
 public func FfiConverterTypeHostContext_lift(_ pointer: UnsafeMutableRawPointer) throws -> HostContext {
     return try FfiConverterTypeHostContext.lift(pointer)
 }
 
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
 public func FfiConverterTypeHostContext_lower(_ value: HostContext) -> UnsafeMutableRawPointer {
     return FfiConverterTypeHostContext.lower(value)
 }
